@@ -1,8 +1,9 @@
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
+using Unity.Netcode;
 
-public abstract class InteractableBase : MonoBehaviour, IInteractable
+public abstract class InteractableBase : NetworkBehaviour, IInteractable
 {
     [Header("基本設定 (親クラス)")]
     [SerializeField] protected string textMessage = "None_SO";

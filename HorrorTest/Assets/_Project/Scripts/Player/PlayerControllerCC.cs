@@ -1,99 +1,97 @@
 using UnityEngine;
+using Unity.Netcode;
 
 [RequireComponent(typeof(CharacterController))]
-public class PlayerControllerCC : MonoBehaviour
+public class PlayerControllerCC : NetworkBehaviour
 {
     [Header("移動設定")]
-    [SerializeField] private float walkSpeed = 5f;      // 通常速度
-    [SerializeField] private float sprintSpeed = 8f;    // ダッシュ速度
+    [SerializeField] private float walkSpeed = 5f;
+    [SerializeField] private float sprintSpeed = 8f;
     [SerializeField] private float gravity = -9.81f;
 
     [Header("視点設定（Look）")]
-    [SerializeField] private Transform playerCamera; 
-    [SerializeField] private float mouseSensitivity = 10f; 
-    [SerializeField] private float lookXLimit = 80f; 
+    [SerializeField] private Transform playerCamera;
+    [SerializeField] private float mouseSensitivity = 10f;
+    [SerializeField] private float lookXLimit = 80f;
 
-    // 内部変数
     private CharacterController _controller;
-    private InputActions _inputActions; // 生成されたクラス
-    private Vector2 _moveInput;
-    private Vector2 _lookInput; 
-    private Vector3 _velocity;
-    private bool _isGrounded;
-    private float _xRotation = 0f; 
-    private float _currentSpeed; // 現在の速度を保持する変数
+    private InputActions _inputActions;
+    private float _xRotation = 0f;
+    private Vector3 _velocity; 
 
     private void Awake()
     {
         _controller = GetComponent<CharacterController>();
-        // InputActionsのインスタンスを作成
         _inputActions = new InputActions();
     }
 
-
-    //このスクリプトが有効か無効か
-    private void OnEnable() => _inputActions.Enable();
-    private void OnDisable() => _inputActions.Disable();
-
-    private void Start()
+    public override void OnNetworkSpawn()
     {
+        // 自分がオーナーでない場合はカメラを消して終了
+        if (!IsOwner)
+        {
+            if (playerCamera != null) playerCamera.gameObject.SetActive(false);
+            return;
+        }
+
+        // オーナー（自分）だけの初期設定
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+        _inputActions.Enable();
     }
+
+    private void OnEnable() { if (IsOwner) _inputActions?.Enable(); }
+    private void OnDisable() { _inputActions?.Disable(); }
 
     private void Update()
     {
-        // 1. 入力を取得
-        _moveInput = _inputActions.Player.Move.ReadValue<Vector2>();
-        _lookInput = _inputActions.Player.Look.ReadValue<Vector2>();
+        // 1. 重要：オーナー以外は計算しない
+        if (!IsOwner) return;
+        if (Cursor.lockState != CursorLockMode.Locked) return;
 
+        // 2. 入力を取得
+        Vector2 moveInput = _inputActions.Player.Move.ReadValue<Vector2>();
+        Vector2 lookInput = _inputActions.Player.Look.ReadValue<Vector2>();
+        bool isSprinting = _inputActions.Player.Sprint.IsPressed() && moveInput.y > 0;
 
-        // 1. スプリントボタンが押されている
-        // 2. かつ、スティック/キー入力が「前方向（y > 0）」である
-        if (_inputActions.Player.Sprint.IsPressed() && _moveInput.y > 0)
-        {
-            _currentSpeed = sprintSpeed;
-        }
-        else
-        {
-            _currentSpeed = walkSpeed;
-        }
-        
+        // 3. 視点操作（ローカルで実行 → ClientNetworkTransformが同期）
+        HandleLook(lookInput);
 
-        _isGrounded = _controller.isGrounded;
+        // 4. 移動処理（ローカルで実行 → ClientNetworkTransformが同期）
+        HandleMove(moveInput, isSprinting);
+    }
 
-        // ------------------------------
-        // 視点操作（Look）の処理
-        // ------------------------------
-        transform.Rotate(Vector3.up * _lookInput.x * mouseSensitivity * Time.deltaTime);
+    private void HandleLook(Vector2 lookInput)
+    {
+        // 左右回転（本体を回す）
+        transform.Rotate(Vector3.up * lookInput.x * mouseSensitivity * Time.deltaTime);
 
-        _xRotation -= _lookInput.y * mouseSensitivity * Time.deltaTime;
+        // 上下回転（カメラだけを回す）
+        _xRotation -= lookInput.y * mouseSensitivity * Time.deltaTime;
         _xRotation = Mathf.Clamp(_xRotation, -lookXLimit, lookXLimit);
 
         if (playerCamera != null)
         {
             playerCamera.localRotation = Quaternion.Euler(_xRotation, 0f, 0f);
         }
+    }
 
-        // ------------------------------
-        // 移動操作（Move）の処理
-        // ------------------------------
-        if (_controller == null || !_controller.enabled) 
-        {
-            return; 
-        }
-
-        if (_isGrounded && _velocity.y < 0)
+    private void HandleMove(Vector2 moveInput, bool isSprinting)
+    {
+        // 地面判定と重力リセット
+        if (_controller.isGrounded && _velocity.y < 0)
         {
             _velocity.y = -2f;
         }
 
-        Vector3 move = transform.right * _moveInput.x + transform.forward * _moveInput.y;
-        
-        // ★ _currentSpeed を使って移動
-        _controller.Move(move * _currentSpeed * Time.deltaTime);
+        // 移動方向の計算
+        float speed = isSprinting ? sprintSpeed : walkSpeed;
+        Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
 
-        // 重力
+        // キャラクターを動かす（ServerRpcを通さず直接！）
+        _controller.Move(move * speed * Time.deltaTime);
+
+        // 重力の計算と適用
         _velocity.y += gravity * Time.deltaTime;
         _controller.Move(_velocity * Time.deltaTime);
     }

@@ -3,39 +3,58 @@ using UnityEngine;
 
 public class UIManager : MonoBehaviour
 {
+    [Header("UI設定")]
     public GameObject interactTextPrefab;
-    private GameObject interactText;
+    public Canvas mainCanvas;
     
-    // ★追加：コンポーネントを保存する箱（どんなTMPでも入る型にする）
+    private GameObject interactText;
     private TMP_Text _textComponent;
 
     void Start()
     {
         if (interactTextPrefab == null) return;
-        interactText = Instantiate(interactTextPrefab);
-        
-        // ★追加：生成時に一度だけコンポーネントを探して保存する
+
+        // 生成
+        interactText = Instantiate(interactTextPrefab, mainCanvas.transform);
         _textComponent = interactText.GetComponentInChildren<TMP_Text>();
         
+        // 【重要】名前を変えて、ヒエラルキーで見つけやすくする
+        interactText.name = "DEBUG_InteractText";
+        
+        // 初期状態は非表示
         interactText.SetActive(false);
     }
 
-    public void UpdateUI(IInteractable target, RaycastHit hit)
+    public void UpdateUI(IInteractable target, RaycastHit hit, Quaternion cameraRotation)
     {
-        if (interactText == null || _textComponent == null) return;
-
-        if (target == null || !target.CanInteract)
+        // 参照チェック
+        if (interactText == null)
         {
-            interactText.SetActive(false);
+            Debug.LogError("interactTextが消えています！どこかで破壊された可能性があります。");
             return;
         }
 
-        interactText.SetActive(true);
-        interactText.transform.position = hit.point;
+        // 表示・非表示の判定をシンプルにする
+        if (target == null || !target.CanInteract)
+        {
+            if (interactText.activeSelf) interactText.SetActive(false);
+            return;
+        }
 
-        //カメラ正面
-        interactText.transform.rotation = Camera.main.transform.rotation;
+        // ここまで来たら強制的に表示！
+        if (!interactText.activeSelf) 
+        {
+            Debug.Log("<color=cyan>UIをSetActive(true)にしました！</color>");
+            interactText.SetActive(true);
+        }
 
-        _textComponent.text = target.GetInteractText();
+        // 座標と回転
+        interactText.transform.position = hit.point + (hit.normal * 0.1f);
+        interactText.transform.rotation = cameraRotation;
+
+        if (_textComponent != null)
+        {
+            _textComponent.text = target.GetInteractText();
+        }
     }
 }
