@@ -1,20 +1,23 @@
 using UnityEngine;
 using DG.Tweening;
 
-public class MugController : InteractableBase
+public class MugController : NetworkInteractable
 {
     [Header("マグカップの設定")]
     [SerializeField] private float rotateAngle = 90f;
     [SerializeField] private float duration = 1.0f;
     [SerializeField] private Ease moveEase = Ease.OutQuad;
-
-    public override void OnInteract()
-    {
-        RotateMug();
-        base.OnInteract();
-    }
     
-    private void RotateMug()
+
+    /*
+    protected override void PerformVisualAction()
+    {
+        //RotateMug();
+        base.PerformVisualAction();
+    }
+    */
+
+    public void RotateMug()
     {
         // 親クラスのIsBusyをtrueにする（これでUIが非表示になる）
         IsBusy = true;

@@ -11,7 +11,7 @@ public class NetworkInteractable : InteractableBase
             Debug.LogWarning($"{gameObject.name} はまだネットワークにSpawnされていないため、インタラクトできません。");
             return; 
         }
-
+        
         RequestInteractRpc();
     }
 
