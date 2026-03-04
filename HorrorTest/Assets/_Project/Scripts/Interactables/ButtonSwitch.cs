@@ -17,17 +17,27 @@ public class ButtonSwitch : NetworkInteractable
     }
 
 
-    protected override void PerformVisualAction()
-    {
-        // 全員の画面でボタンが凹む
+    // protected override void PerformVisualAction()
+    // {
+    //     // 全員の画面でボタンが凹む
+    //     if (buttonMesh != null)
+    //     {
+    //         buttonMesh.DOKill();
+    //         buttonMesh.localPosition = _initialPosition;
+    //         buttonMesh.DOPunchPosition(new Vector3(0, 0, -pushDepth), duration, 1, 0);
+    //     }
+
+    //     // 全員の画面でUnityEvent（ドア開閉など）が動く
+    //     base.PerformVisualAction();
+    // }
+
+    //全員の画面でボタンが凹む
+    public void PushButton(){
         if (buttonMesh != null)
         {
             buttonMesh.DOKill();
             buttonMesh.localPosition = _initialPosition;
             buttonMesh.DOPunchPosition(new Vector3(0, 0, -pushDepth), duration, 1, 0);
         }
-
-        // 全員の画面でUnityEvent（ドア開閉など）が動く
-        base.PerformVisualAction();
     }
 }

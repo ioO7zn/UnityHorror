@@ -18,7 +18,7 @@ public abstract class InteractableBase : NetworkBehaviour, IInteractable
 
     private bool _isBusy = false;
 
-    public virtual void OnInteract()
+    public virtual void Interact()
     {
         if (IsBusy) return;
         onInteract?.Invoke();

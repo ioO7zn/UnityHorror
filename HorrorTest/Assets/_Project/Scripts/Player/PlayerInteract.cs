@@ -1,102 +1,76 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 using Unity.Cinemachine;
 using Unity.Netcode;
+using UnityEngine.InputSystem; // CallbackContext用
 
 public class PlayerInteract : NetworkBehaviour
 {
-    [Header("参照")]
+    [Header("参照 (Prefab内で完結)")]
     [SerializeField] private CinemachineCamera _playerCamera;
-    [SerializeField] private UIManager _uiManager; // 直接アタッチするか自動取得する
     
     [Header("設定")]
     [SerializeField] private float _interactDistance = 3f;
     [SerializeField] private LayerMask _interactLayer;
 
-    [SerializeField] private InputActionReference _interactAction;
-
-    private IInteractable currentTarget;
-    private RaycastHit currentHit;
+    private IInteractable _currentTarget;
+    private RaycastHit _currentHit;
 
     public override void OnNetworkSpawn()
     {
+        // 自分が操作するプレイヤー以外なら、このスクリプト自体を停止
         if (!IsOwner)
         {
-            // 自分以外ならUIごと非表示にする
-            if (_uiManager != null && _uiManager.mainCanvas != null)
-            {
-                _uiManager.mainCanvas.gameObject.SetActive(false);
-            }
             enabled = false;
             return;
         }
 
-        // 自分の場合はUIを確実に表示
-        if (_uiManager != null && _uiManager.mainCanvas != null)
-        {
-            _uiManager.mainCanvas.gameObject.SetActive(true);
-            _uiManager.mainCanvas.enabled = true;
-        }
-
-        // アクション自動取得
-        if (_interactAction == null)
-        {
-            var playerInput = GetComponent<PlayerInput>();
-            if (playerInput != null)
-            {
-                var action = playerInput.actions.FindAction("Interact");
-                if (action != null) _interactAction = InputActionReference.Create(action);
-            }
-        }
-    }
-
-    private void OnEnable()
-    {
-        if (IsOwner && _interactAction != null) _interactAction.action.Enable();
-    }
-
-    private void OnDisable()
-    {
-        if (IsOwner && _interactAction != null) _interactAction.action.Disable();
+        // UIの初期状態などはUIManager側で管理するため、ここでは何もしなくてOK
     }
 
     void Update()
     {
-        // 念押しでIsOwnerチェック（これだけで混線は100%防げる）
-        if (!IsOwner) return;
-
+        // OnNetworkSpawnで制限しているので、ここは常にIsOwner
         UpdateRay();
 
-        if (_uiManager != null)
+        // UIManagerに報告（回転や表示判断はUI側で自律的に行う）
+        if (UIManager.Instance != null)
         {
-            // 自分のカメラの回転を渡す
-            _uiManager.UpdateUI(currentTarget, currentHit, _playerCamera.transform.rotation);
+            UIManager.Instance.UpdateUI(_currentTarget, _currentHit);
         }
-
-        HandleInput();
     }
 
     private void UpdateRay()
     {
-        currentTarget = null;
+        _currentTarget = null;
+        
+        // カメラの正面へレイを飛ばす
         Ray ray = new Ray(_playerCamera.transform.position, _playerCamera.transform.forward);
 
         if (Physics.Raycast(ray, out RaycastHit hit, _interactDistance, _interactLayer))
         {
-            IInteractable interactable = hit.collider.GetComponent<IInteractable>();
-            if (interactable != null && interactable.CanInteract)
+            // インターフェースの取得は TryGetComponent が安全で効率的
+            if (hit.collider.TryGetComponent<IInteractable>(out var interactable))
             {
-                currentTarget = interactable;
-                currentHit = hit;
+                if (interactable.CanInteract)
+                {
+                    _currentTarget = interactable;
+                    _currentHit = hit;
+                }
             }
         }
     }
 
-    private void HandleInput()
+    /// <summary>
+    /// Player Input コンポーネントの Events -> Interact から 
+    /// Dynamic (InputAction.CallbackContext) で繋ぐ
+    /// </summary>
+    public void OnInteract(InputAction.CallbackContext context)
     {
-        if (currentTarget != null && _interactAction != null && _interactAction.action.WasPressedThisFrame())
+        // ボタンが押された瞬間のみ実行
+        if (context.started && _currentTarget != null)
         {
-            currentTarget.OnInteract();
+            _currentTarget.Interact();
+            Debug.Log($"{_currentHit.collider.name} とインタラクトした！");
         }
     }
 }

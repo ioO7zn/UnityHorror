@@ -1,98 +1,141 @@
 using UnityEngine;
+using Unity.Cinemachine;
 using Unity.Netcode;
+using UnityEngine.InputSystem; // CallbackContext用
+using UnityEngine.Events;
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerControllerCC : NetworkBehaviour
 {
+    [Header("参照 (Prefab内で完結)")]
+    [SerializeField] private Transform _cameraRoot;
+    [SerializeField] private Animator _animator; // <-- 1. 宣言を追加
+    
     [Header("移動設定")]
-    [SerializeField] private float walkSpeed = 5f;
-    [SerializeField] private float sprintSpeed = 8f;
-    [SerializeField] private float gravity = -9.81f;
+    [SerializeField] private float _walkSpeed = 5f;
+    [SerializeField] private float _sprintSpeed = 8f;
+    [SerializeField] private float _gravity = -9.81f;
 
-    [Header("視点設定（Look）")]
-    [SerializeField] private Transform playerCamera;
-    [SerializeField] private float mouseSensitivity = 10f;
-    [SerializeField] private float lookXLimit = 80f;
+    [Header("視点設定")]
+    [SerializeField] private float _mouseSensitivity = 0.1f;
+    [SerializeField] private float _lookXLimit = 80f;
+
+    [Header("外部通知 (UI等へ)")]
+    public UnityEvent<int> OnSlotSelected;
 
     private CharacterController _controller;
-    private InputActions _inputActions;
+    private Vector2 _moveInput;
+    private Vector2 _lookInput;
+    private bool _isSprinting;
+    
     private float _xRotation = 0f;
-    private Vector3 _velocity; 
+    private Vector3 _velocity;
 
     private void Awake()
     {
         _controller = GetComponent<CharacterController>();
-        _inputActions = new InputActions();
+        // <-- 2. 自動的に子オブジェクトからAnimatorを探す設定を追加
+        if (_animator == null) _animator = GetComponentInChildren<Animator>();
     }
 
     public override void OnNetworkSpawn()
     {
-        // 自分がオーナーでない場合はカメラを消して終了
+        // 自分が操作するプレイヤー以外なら、このスクリプト自体を停止
         if (!IsOwner)
         {
-            if (playerCamera != null) playerCamera.gameObject.SetActive(false);
+            if (_cameraRoot != null) _cameraRoot.gameObject.SetActive(false);
+            enabled = false;
             return;
         }
 
-        // オーナー（自分）だけの初期設定
+        // オーナーのみマウスロック
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
-        _inputActions.Enable();
     }
 
-    private void OnEnable() { if (IsOwner) _inputActions?.Enable(); }
-    private void OnDisable() { _inputActions?.Disable(); }
-
-    private void Update()
+    void Update()
     {
-        // 1. 重要：オーナー以外は計算しない
-        if (!IsOwner) return;
+        // OnNetworkSpawnで制限済みのため、常にIsOwner
         if (Cursor.lockState != CursorLockMode.Locked) return;
 
-        // 2. 入力を取得
-        Vector2 moveInput = _inputActions.Player.Move.ReadValue<Vector2>();
-        Vector2 lookInput = _inputActions.Player.Look.ReadValue<Vector2>();
-        bool isSprinting = _inputActions.Player.Sprint.IsPressed() && moveInput.y > 0;
-
-        // 3. 視点操作（ローカルで実行 → ClientNetworkTransformが同期）
-        HandleLook(lookInput);
-
-        // 4. 移動処理（ローカルで実行 → ClientNetworkTransformが同期）
-        HandleMove(moveInput, isSprinting);
+        HandleRotation();
+        HandleMovement();
     }
 
-    private void HandleLook(Vector2 lookInput)
+    // --- Unityの Player Input (Events) から紐付けるメソッド群 ---
+
+    public void OnMove(InputAction.CallbackContext context)
     {
-        // 左右回転（本体を回す）
-        transform.Rotate(Vector3.up * lookInput.x * mouseSensitivity * Time.deltaTime);
+        _moveInput = context.ReadValue<Vector2>();
+    }
 
-        // 上下回転（カメラだけを回す）
-        _xRotation -= lookInput.y * mouseSensitivity * Time.deltaTime;
-        _xRotation = Mathf.Clamp(_xRotation, -lookXLimit, lookXLimit);
+    public void OnLook(InputAction.CallbackContext context)
+    {
+        _lookInput = context.ReadValue<Vector2>();
+    }
 
-        if (playerCamera != null)
+    public void OnSprint(InputAction.CallbackContext context)
+    {
+        if (context.performed) _isSprinting = true;
+        if (context.canceled) _isSprinting = false;
+    }
+
+    public void OnSlot(InputAction.CallbackContext context)
+    {
+        // 1~4などのキー入力を想定。context.control.name等からIndexを抽出するか、
+        // 単純にActionを分けてインスペクターで 0, 1, 2... と引数を指定する
+        if (context.started)
         {
-            playerCamera.localRotation = Quaternion.Euler(_xRotation, 0f, 0f);
+            // インスペクター側で引数(int)を直接指定する場合は不要だが
+            // 汎用的に使うならここで処理を分岐
         }
     }
 
-    private void HandleMove(Vector2 moveInput, bool isSprinting)
+    // --- 内部ロジック ---
+
+    private void HandleRotation()
     {
-        // 地面判定と重力リセット
+        // 左右：本体を回転
+        transform.Rotate(Vector3.up * _lookInput.x * _mouseSensitivity);
+
+        // 上下：カメラ（Cinemachine）を回転
+        _xRotation -= _lookInput.y * _mouseSensitivity;
+        _xRotation = Mathf.Clamp(_xRotation, -_lookXLimit, _lookXLimit);
+        
+        if (_cameraRoot != null)
+        {
+            _cameraRoot.transform.localRotation = Quaternion.Euler(_xRotation, 0f, 0f);
+        }
+    }
+
+    private void HandleMovement()
+    {
         if (_controller.isGrounded && _velocity.y < 0)
         {
             _velocity.y = -2f;
         }
 
-        // 移動方向の計算
-        float speed = isSprinting ? sprintSpeed : walkSpeed;
-        Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
+        float currentSpeed = (_isSprinting && _moveInput.y > 0) ? _sprintSpeed : _walkSpeed;
+        Vector3 moveDir = transform.right * _moveInput.x + transform.forward * _moveInput.y;
 
-        // キャラクターを動かす（ServerRpcを通さず直接！）
-        _controller.Move(move * speed * Time.deltaTime);
+        _controller.Move(moveDir * currentSpeed * Time.deltaTime);
 
-        // 重力の計算と適用
-        _velocity.y += gravity * Time.deltaTime;
+        _velocity.y += _gravity * Time.deltaTime;
         _controller.Move(_velocity * Time.deltaTime);
+
+        // --- 3. ここに Animator への橋渡しを追加 ---
+        if (_animator != null)
+        {
+            // 入力の絶対量（0～1）をスピードとして渡す
+            // これにより、歩き・走りのアニメーションが自動で切り替わる
+            float inputMagnitude = _moveInput.magnitude;
+            
+            // もし「走っている」なら値を少し大きくして走るモーションを強調しても良い
+            float animationSpeed = _isSprinting ? inputMagnitude * 2.0f : inputMagnitude;
+            
+            _animator.SetFloat("Speed", animationSpeed);
+        }
+
+        
     }
 }

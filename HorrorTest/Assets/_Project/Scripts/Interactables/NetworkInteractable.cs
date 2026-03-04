@@ -3,7 +3,7 @@ using Unity.Netcode;
 
 public class NetworkInteractable : InteractableBase
 {
-    public override void OnInteract()
+    public override void Interact()
     {
         // 【重要】Spawnされていない（ネットワーク同期が始まっていない）ならRPCを送らない
         if (!IsSpawned) 
@@ -27,8 +27,12 @@ public class NetworkInteractable : InteractableBase
         PerformVisualAction();
     }
 
-    protected virtual void PerformVisualAction()
+    // protected virtual void PerformVisualAction()
+    // {
+    //     base.Interact();
+    // }
+    private void PerformVisualAction()
     {
-        base.OnInteract();
+        base.Interact();
     }
 }

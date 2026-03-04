@@ -2,10 +2,9 @@ using UnityEngine.InputSystem;
 
 public interface IInteractable
 {
-    // 「調べられた時の動作」を約束する
-    void OnInteract();
-    
-    // UIに表示する文字（例："ロッカーに隠れる"）
+    //実行する
+    void Interact();
+    // UIに表示したい文字を返す
     string GetInteractText();
 
     //アクションそのものを返すようにする
