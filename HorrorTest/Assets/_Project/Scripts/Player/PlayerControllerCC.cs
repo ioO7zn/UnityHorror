@@ -53,10 +53,13 @@ public class PlayerControllerCC : NetworkBehaviour
         Cursor.visible = false;
     }
 
+
+
     void Update()
     {
         // OnNetworkSpawnで制限済みのため、常にIsOwner
         if (Cursor.lockState != CursorLockMode.Locked) return;
+        
 
         HandleRotation();
         HandleMovement();

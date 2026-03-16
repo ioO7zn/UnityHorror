@@ -154,7 +154,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MagController
   ShowTopMostFoldoutHeaderGroup: 1
   textMessage: Operation
-  interactAction: {fileID: 0}
+  interactAction: {fileID: 7372766015037339573, guid: a0fc64fef9a1cfa48809f869f9a02c61, type: 3}
   onInteract:
     m_PersistentCalls:
       m_Calls:
