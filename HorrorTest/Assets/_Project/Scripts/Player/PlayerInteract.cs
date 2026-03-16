@@ -1,7 +1,6 @@
 using UnityEngine;
 using Unity.Cinemachine;
 using Unity.Netcode;
-using UnityEngine.InputSystem; // CallbackContext用
 
 public class PlayerInteract : NetworkBehaviour
 {
@@ -29,10 +28,9 @@ public class PlayerInteract : NetworkBehaviour
 
     void Update()
     {
-        // OnNetworkSpawnで制限しているので、ここは常にIsOwner
         UpdateRay();
 
-        // UIManagerに報告（回転や表示判断はUI側で自律的に行う）
+        // UIManagerに報告
         if (UIManager.Instance != null)
         {
             UIManager.Instance.UpdateUI(_currentTarget, _currentHit);
@@ -48,7 +46,7 @@ public class PlayerInteract : NetworkBehaviour
 
         if (Physics.Raycast(ray, out RaycastHit hit, _interactDistance, _interactLayer))
         {
-            // インターフェースの取得は TryGetComponent が安全で効率的
+            // インターフェースの取得
             if (hit.collider.TryGetComponent<IInteractable>(out var interactable))
             {
                 if (interactable.CanInteract)
@@ -60,14 +58,9 @@ public class PlayerInteract : NetworkBehaviour
         }
     }
 
-    /// <summary>
-    /// Player Input コンポーネントの Events -> Interact から 
-    /// Dynamic (InputAction.CallbackContext) で繋ぐ
-    /// </summary>
-    public void OnInteract(InputAction.CallbackContext context)
+    public void DoInteract()
     {
-        // ボタンが押された瞬間のみ実行
-        if (context.started && _currentTarget != null)
+        if (_currentTarget != null)
         {
             _currentTarget.Interact();
             Debug.Log($"{_currentHit.collider.name} とインタラクトした！");
