@@ -5,7 +5,6 @@ public class NetworkInteractable : InteractableBase
 {
     public override void Interact()
     {
-        // 【重要】Spawnされていない（ネットワーク同期が始まっていない）ならRPCを送らない
         if (!IsSpawned) 
         {
             Debug.LogWarning($"{gameObject.name} はまだネットワークにSpawnされていないため、インタラクトできません。");
@@ -16,9 +15,20 @@ public class NetworkInteractable : InteractableBase
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
-    private void RequestInteractRpc()
+    private void RequestInteractRpc(RpcParams rpcParams = default)
     {
+        // 通信を送ってきたプレイヤーのIDを取得
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        
+        //全員に見た目を同期する「前」に、サーバー専用の処理を実行する
+        OnServerInteract(senderId);
+
         ExecuteInteractRpc();
+    }
+
+    protected virtual void OnServerInteract(ulong clientId)
+    {
+        // デフォルトでは何もしない（ドアなどはそのままEveryoneへ流れる）
     }
 
     [Rpc(SendTo.Everyone)]
@@ -27,10 +37,6 @@ public class NetworkInteractable : InteractableBase
         PerformVisualAction();
     }
 
-    // protected virtual void PerformVisualAction()
-    // {
-    //     base.Interact();
-    // }
     private void PerformVisualAction()
     {
         base.Interact();

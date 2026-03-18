@@ -1,76 +1,133 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
-using Unity.Netcode; // NGO（Netcode for GameObjects）を使用するために必須
+using Unity.Netcode;
 
-/// <summary>
-/// プレイヤーの所持品を管理するコンポーネント。
-/// プレイヤーのPrefab（NetworkObject付き）にアタッチしてください。
-/// </summary>
 public class PlayerInventory : NetworkBehaviour
 {
-    // --- データの保持 ---
-    // インスペクターから中身が見えるようにSerializeFieldにしています
-    [SerializeField] private List<ItemData> items = new List<ItemData>();
+    [Header("全てのアイテムデータを登録（全プレイヤー共通）")]
+    [SerializeField] private List<ItemData> allItemDatabase = new List<ItemData>();
 
-    // --- 通知システム ---
-    // UI側がこのイベントを購読することで、アイテムが増えた瞬間に画面を更新できます
-    public event Action OnInventoryChanged;
+    [SerializeField] private List<int> victoryItemIds = new List<int> { 1, 2, 3 };
 
+    // 内部的なIDリスト（サーバーが管理し、Ownerに同期される）
+    
+    private NetworkList<int> itemIds = new NetworkList<int>();
 
-    // --- メソッド（機能） ---
+    // 表示用のリスト（UIなどで使用）
+    public List<ItemData> currentItems = new List<ItemData>();
+    public System.Action OnInventoryChanged;
 
-    /// <summary>
-    /// アイテムをインベントリに追加する
-    /// </summary>
-    /// <param name="newItem">追加するアイテムのScriptableObject</param>
-    public void AddItem(ItemData newItem)
+    private GameManager gameManager;
+
+    private void Start()
     {
-        // 【重要】マルチプレイのガード：
-        // 自分のキャラクター（自身が操作しているインスタンス）のリストのみを更新します
+        gameManager = Object.FindFirstObjectByType<GameManager>();
+    }
+
+    private void Awake()
+    {
+        // NetworkListの初期化（ここで行うのが最も安全）
+        itemIds = new NetworkList<int>(
+            null,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server // サーバーだけが書き込める
+        );
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        if (IsOwner)
+        {
+            itemIds.OnListChanged += (_) => RefreshLocalList();
+            RefreshLocalList();
+        }
+    }
+
+    // サーバーがアイテムを追加する窓口
+    public void AddItem(int id)
+    {
+        if (!IsServer) return;
+        itemIds.Add(id);
+
+        CheckVictoryCondition();
+    }
+
+    // ★今回のメイン：捨てる実行窓口
+    public void DoDrop(int index = -1)
+    {
         if (!IsOwner) return;
 
-        if (newItem == null)
+        // 指定がなければ最後を捨てる
+        int targetIndex = (index == -1) ? currentItems.Count - 1 : index;
+
+        if (targetIndex >= 0 && targetIndex < currentItems.Count)
         {
-            Debug.LogWarning("追加しようとしたアイテムデータが空です。");
-            return;
+            // サーバーに「この番号を消して実体を出して」と頼む
+            DropItemServerRpc(targetIndex);
         }
+    }
 
-        items.Add(newItem);
-        Debug.Log($"<color=cyan>[Inventory]</color> {newItem.itemName} を入手しました！");
+    [Rpc(SendTo.Server)]
+    private void DropItemServerRpc(int index)
+    {
+        if (index < 0 || index >= itemIds.Count) return;
 
-        // UIなどの購読者に「変更があった」ことを通知
+        int idToDrop = itemIds[index];
+        var data = allItemDatabase.Find(d => d.itemID == idToDrop);
+
+        if (data != null && data.worldPrefab != null)
+        {
+            // 1. 先に実体を生成して Spawn する
+            Vector3 spawnPos = transform.position + (transform.forward * 1.5f) + (Vector3.up * 0.8f);
+            GameObject droppedObj = Instantiate(data.worldPrefab, spawnPos, Quaternion.identity);
+            
+            if (droppedObj.TryGetComponent<PickableItem>(out var pickable))
+            {
+                pickable.data = data;
+            }
+            
+            droppedObj.GetComponent<NetworkObject>().Spawn(true);
+
+            // 2. 「最後」にリストから消す
+            itemIds.RemoveAt(index);
+        }
+    }
+
+    private void RefreshLocalList()
+    {
+        currentItems.Clear();
+        foreach (int id in itemIds)
+        {
+            var data = allItemDatabase.Find(d => d.itemID == id);
+            if (data != null) currentItems.Add(data);
+        }
         OnInventoryChanged?.Invoke();
     }
 
-    /// <summary>
-    /// 特定のアイテムを持っているかチェックする（鍵の判定などに使用）
-    /// </summary>
-    public bool HasItem(ItemData targetData)
-    {
-        // 自分の所持リストの中に、指定されたSOが含まれているかを確認
-        return items.Contains(targetData);
-    }
+    public List<ItemData> GetItemList() => currentItems;
 
-    /// <summary>
-    /// インベントリ内の全アイテムを取得（UI表示用）
-    /// </summary>
-    public List<ItemData> GetItemList()
+    private void CheckVictoryCondition()
     {
-        return items;
-    }
+        if (!IsServer || gameManager == null) return;
 
-    /// <summary>
-    /// アイテムを使用したり捨てたりして、リストから削除する
-    /// </summary>
-    public void RemoveItem(ItemData targetData)
-    {
-        if (!IsOwner) return;
-
-        if (items.Contains(targetData))
+        // 現在のインベントリに、勝利に必要なIDが全て含まれているか確認
+        bool hasAllKeys = true;
+        foreach (int requiredId in victoryItemIds)
         {
-            items.Remove(targetData);
-            OnInventoryChanged?.Invoke();
+            if (!itemIds.Contains(requiredId))
+            {
+                hasAllKeys = false;
+                break;
+            }
+        }
+
+        // 揃っていたら、GameManagerに通知
+        if (hasAllKeys)
+        {
+            Debug.Log($"[Server] プレイヤー {OwnerClientId} が勝利条件を達成しました！");
+            gameManager.BroadcastVictoryRpc(OwnerClientId); // GameManagerの勝利RPCを呼ぶ
         }
     }
+
+
 }

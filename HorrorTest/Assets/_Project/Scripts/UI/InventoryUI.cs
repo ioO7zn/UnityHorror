@@ -1,66 +1,80 @@
 using UnityEngine;
-using UnityEngine.UI; // Imageコンポーネント用
+using UnityEngine.UI;
 using Unity.Netcode;
 using System.Collections.Generic;
 
 public class InventoryUI : MonoBehaviour
 {
     [Header("スロット設定")]
-    // Unityエディタ上で、作成済みのImage（スロット）を順番にドラッグ＆ドロップしてください
-    [SerializeField] private List<Image> itemSlots = new List<Image>();
-    
-    [Header("デフォルト設定")]
-    [SerializeField] private Sprite emptySlotSprite; // 空の時に表示する画像（透明な枠など）
+    [SerializeField] private List<Image> itemSlots;
+    [SerializeField] private Sprite emptySlotSprite; // 空枠の画像（なければnullでOK）
 
-    private PlayerInventory targetInventory;
+    private PlayerInventory localInventory;
 
     private void Update()
     {
-        if (targetInventory == null) TryFindLocalPlayer();
+        // まだ自分のインベントリを見つけていなければ探し続ける
+        if (localInventory == null)
+        {
+            TryBindInventory();
+        }
+
+        
     }
 
-    private void TryFindLocalPlayer()
+    private void TryBindInventory()
     {
-        if (NetworkManager.Singleton?.LocalClient?.PlayerObject != null)
+        // ネットワークが動いていて、自分のキャラが存在するか確認
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient)
         {
-            if (NetworkManager.Singleton.LocalClient.PlayerObject.TryGetComponent<PlayerInventory>(out var inv))
+            var playerObj = NetworkManager.Singleton.LocalClient?.PlayerObject;
+            if (playerObj != null && playerObj.TryGetComponent<PlayerInventory>(out var inv))
             {
-                targetInventory = inv;
-                targetInventory.OnInventoryChanged += RefreshUI;
-                RefreshUI();
+                localInventory = inv;
+                localInventory.OnInventoryChanged += RefreshUI; // 監視スタート
+                RefreshUI(); // 初回表示
             }
         }
     }
 
     private void RefreshUI()
     {
-        if (targetInventory == null) return;
+        if (localInventory == null) return;
 
-        var items = targetInventory.GetItemList();
+        // 最新のアイテムリストを取得
+        var items = localInventory.currentItems;
 
-        // 全スロットを一旦リセット、またはアイテムを割り当て
         for (int i = 0; i < itemSlots.Count; i++)
         {
             if (i < items.Count)
             {
-                // アイテムがある場合：画像を表示して、色を不透明にする
+                // アイテムを持っている枠
                 itemSlots[i].sprite = items[i].icon;
-                itemSlots[i].color = Color.white; 
-                itemSlots[i].enabled = true; // 画像がセットされている時だけ有効にする
+                itemSlots[i].color = Color.white;
+                itemSlots[i].enabled = true;
             }
             else
             {
-                // アイテムがない場合：空の画像にするか、非表示にする
+                // 空の枠
                 itemSlots[i].sprite = emptySlotSprite;
-                // もし空枠の画像がないなら、enabled = false で消してもOK
-                if (emptySlotSprite == null) itemSlots[i].enabled = false;
+                if (emptySlotSprite == null)
+                {
+                    itemSlots[i].enabled = false; // 画像がなければ非表示
+                }
+                else
+                {
+                    itemSlots[i].color = new Color(1, 1, 1, 0.5f); // 半透明にするなど
+                    itemSlots[i].enabled = true;
+                }
             }
         }
     }
 
     private void OnDestroy()
     {
-        if (targetInventory != null)
-            targetInventory.OnInventoryChanged -= RefreshUI;
+        if (localInventory != null)
+        {
+            localInventory.OnInventoryChanged -= RefreshUI;
+        }
     }
 }

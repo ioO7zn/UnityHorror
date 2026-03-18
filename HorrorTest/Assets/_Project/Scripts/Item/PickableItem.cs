@@ -3,48 +3,27 @@ using Unity.Netcode;
 
 public class PickableItem : NetworkInteractable 
 {
-    public ItemData data; 
+    [Header("このアイテムのデータ")]
+    public ItemData data;
 
-    // UnityEventから呼ばれる関数
-    public void RequestPickup() 
+    protected override void OnServerInteract(ulong clientId)
     {
-        // 1. 【重要】消す前にインベントリに追加する
-        // 通信ラグを考慮し、操作した本人（LocalClient）の画面で即座に実行します
-        var localPlayer = NetworkManager.Singleton.LocalClient.PlayerObject;
-        if (localPlayer != null && localPlayer.TryGetComponent<PlayerInventory>(out var inventory))
-        {
-            inventory.AddItem(data);
-            Debug.Log($"<color=green>[Inventory]</color> {data.itemName} を追加しました");
-        }
+        if (!IsServer || data == null) return;
 
-        // 2. サーバーへ消去を依頼
-        if (IsServer)
+        // 1. サーバー側でプレイヤーを特定
+        if (NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
         {
-            ExecuteDespawn();
-        }
-        else
-        {
-            RequestDespawnRpc();
-        }
-    }
-
-    // 修正ポイント：[Rpc] 属性を付与し、InvokePermissionを設定
-    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
-    private void RequestDespawnRpc()
-    {
-        ExecuteDespawn();
-    }
-
-    private void ExecuteDespawn()
-    {
-        if (NetworkObject != null && NetworkObject.IsSpawned)
-        {
-            // 修正ポイント：警告対策。第1引数(destroy)をfalseに設定
-            // これにより「In-scene network objects」の警告を回避し、安全にネットワークから切り離します
-            NetworkObject.Despawn(false);
-            
-            // ネットワークから消えた後、メモリからも削除する
-            Destroy(gameObject); 
+            if (client.PlayerObject.TryGetComponent<PlayerInventory>(out var inventory))
+            {
+                // 2. インベントリに追加
+                inventory.AddItem(data.itemID);
+                
+                // 3. ネットワークから消去（Despawnが先！）
+                if (NetworkObject.IsSpawned)
+                {
+                    NetworkObject.Despawn(true);
+                }
+            }
         }
     }
 }
