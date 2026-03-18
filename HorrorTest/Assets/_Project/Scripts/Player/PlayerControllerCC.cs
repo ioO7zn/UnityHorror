@@ -1,100 +1,71 @@
 using UnityEngine;
+using Unity.Cinemachine;
+using UnityEngine.InputSystem; // CallbackContext用
+using UnityEngine.Events;
 
 [RequireComponent(typeof(CharacterController))]
-public class PlayerControllerCC : MonoBehaviour
+public class PlayerControllerCC : CharacterBase
 {
-    [Header("移動設定")]
-    [SerializeField] private float walkSpeed = 5f;      // 通常速度
-    [SerializeField] private float sprintSpeed = 8f;    // ダッシュ速度
-    [SerializeField] private float gravity = -9.81f;
+    [Header("プレイヤー専用参照")]
+    [SerializeField] private Transform _cameraRoot;
+    [SerializeField] private float _mouseSensitivity = 0.1f;
+    [SerializeField] private float _lookXLimit = 80f;
 
-    [Header("視点設定（Look）")]
-    [SerializeField] private Transform playerCamera; 
-    [SerializeField] private float mouseSensitivity = 10f; 
-    [SerializeField] private float lookXLimit = 80f; 
+    protected PlayerInteract _interact;
+    protected Vector2 _moveInput;
+    protected Vector2 _lookInput;
+    protected bool _isSprinting;
+    private float _xRotation = 0f;
 
-    // 内部変数
-    private CharacterController _controller;
-    private InputActions _inputActions; // 生成されたクラス
-    private Vector2 _moveInput;
-    private Vector2 _lookInput; 
-    private Vector3 _velocity;
-    private bool _isGrounded;
-    private float _xRotation = 0f; 
-    private float _currentSpeed; // 現在の速度を保持する変数
-
-    private void Awake()
+    protected override void Awake()
     {
-        _controller = GetComponent<CharacterController>();
-        // InputActionsのインスタンスを作成
-        _inputActions = new InputActions();
+        base.Awake(); // CharacterBaseの取得を呼ぶ
+        _interact = GetComponent<PlayerInteract>();
     }
 
-
-    //このスクリプトが有効か無効か
-    private void OnEnable() => _inputActions.Enable();
-    private void OnDisable() => _inputActions.Disable();
-
-    private void Start()
+    public override void OnNetworkSpawn()
     {
+        // 自分が操作するプレイヤー以外なら、このスクリプトとカメラを無効化
+        if (!IsOwner)
+        {
+            if (_cameraRoot != null) _cameraRoot.gameObject.SetActive(false);
+            enabled = false;
+            return;
+        }
+
+        // オーナーのみマウスロック
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
 
-    private void Update()
+    protected virtual void Update()
     {
-        // 1. 入力を取得
-        _moveInput = _inputActions.Player.Move.ReadValue<Vector2>();
-        _lookInput = _inputActions.Player.Look.ReadValue<Vector2>();
+        if (!IsOwner || Cursor.lockState != CursorLockMode.Locked) return;
 
-
-        // 1. スプリントボタンが押されている
-        // 2. かつ、スティック/キー入力が「前方向（y > 0）」である
-        if (_inputActions.Player.Sprint.IsPressed() && _moveInput.y > 0)
-        {
-            _currentSpeed = sprintSpeed;
-        }
-        else
-        {
-            _currentSpeed = walkSpeed;
-        }
+        HandleRotation();
         
+        float targetSpeed = (_isSprinting && _moveInput.y > 0) ? _sprintSpeed : _walkSpeed;
+        Vector3 moveDir = transform.right * _moveInput.x + transform.forward * _moveInput.y;
 
-        _isGrounded = _controller.isGrounded;
+        // 肉体（Base）に命令を出す
+        ApplyMovement(moveDir, targetSpeed, _isSprinting);
+    }
 
-        // ------------------------------
-        // 視点操作（Look）の処理
-        // ------------------------------
-        transform.Rotate(Vector3.up * _lookInput.x * mouseSensitivity * Time.deltaTime);
+    private void HandleRotation()
+    {
+        transform.Rotate(Vector3.up * _lookInput.x * _mouseSensitivity);
+        _xRotation -= _lookInput.y * _mouseSensitivity;
+        _xRotation = Mathf.Clamp(_xRotation, -_lookXLimit, _lookXLimit);
+        if (_cameraRoot != null) _cameraRoot.localRotation = Quaternion.Euler(_xRotation, 0f, 0f);
+    }
 
-        _xRotation -= _lookInput.y * mouseSensitivity * Time.deltaTime;
-        _xRotation = Mathf.Clamp(_xRotation, -lookXLimit, lookXLimit);
+    // --- Input System Events ---
+    public void OnMove(InputAction.CallbackContext context) => _moveInput = context.ReadValue<Vector2>();
+    public void OnLook(InputAction.CallbackContext context) => _lookInput = context.ReadValue<Vector2>();
 
-        if (playerCamera != null)
-        {
-            playerCamera.localRotation = Quaternion.Euler(_xRotation, 0f, 0f);
-        }
-
-        // ------------------------------
-        // 移動操作（Move）の処理
-        // ------------------------------
-        if (_controller == null || !_controller.enabled) 
-        {
-            return; 
-        }
-
-        if (_isGrounded && _velocity.y < 0)
-        {
-            _velocity.y = -2f;
-        }
-
-        Vector3 move = transform.right * _moveInput.x + transform.forward * _moveInput.y;
-        
-        // ★ _currentSpeed を使って移動
-        _controller.Move(move * _currentSpeed * Time.deltaTime);
-
-        // 重力
-        _velocity.y += gravity * Time.deltaTime;
-        _controller.Move(_velocity * Time.deltaTime);
+    public void OnSprint(InputAction.CallbackContext context)
+    {
+        if (context.performed) _isSprinting = true;
+        if (context.canceled) _isSprinting = false;
     }
 }

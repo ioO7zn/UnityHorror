@@ -12,7 +12,7 @@ public class LockerController : InteractableBase
 
     private bool _isInside = false; // 現在中にいるか
 
-    public override void OnInteract()
+    public override void Interact()
     {
         if (!_isInside)
         {
@@ -22,7 +22,7 @@ public class LockerController : InteractableBase
         {
             StartCoroutine(ExitLocker());
         }
-        base.OnInteract();
+        base.Interact();
     }
     
 

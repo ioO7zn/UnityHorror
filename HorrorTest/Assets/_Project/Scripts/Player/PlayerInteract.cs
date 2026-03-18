@@ -1,65 +1,69 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
+using Unity.Cinemachine;
+using Unity.Netcode;
 
-public class PlayerInteract : MonoBehaviour
+public class PlayerInteract : NetworkBehaviour
 {
-    [Header("参照")]
-    [SerializeField] private Camera _playerCamera;
-    [SerializeField] private UIManager uIManager;
+    [Header("参照 (Prefab内で完結)")]
+    [SerializeField] private CinemachineCamera _playerCamera;
+    
     [Header("設定")]
     [SerializeField] private float _interactDistance = 3f;
     [SerializeField] private LayerMask _interactLayer;
-    [SerializeField] private InputActionReference _interactAction;
 
+    private IInteractable _currentTarget;
+    private RaycastHit _currentHit;
 
-    private IInteractable currentTarget;  // 視線の先にあるもの
-    private RaycastHit currentHit;
-
-    private void OnEnable()
+    public override void OnNetworkSpawn()
     {
-        if (_interactAction != null) _interactAction.action.Enable();
-    }
+        // 自分が操作するプレイヤー以外なら、このスクリプト自体を停止
+        if (!IsOwner)
+        {
+            enabled = false;
+            return;
+        }
 
-    private void OnDisable()
-    {
-        if (_interactAction != null) _interactAction.action.Disable();
+        // UIの初期状態などはUIManager側で管理するため、ここでは何もしなくてOK
     }
 
     void Update()
     {
         UpdateRay();
-        uIManager.UpdateUI(currentTarget, currentHit); //UIに渡す
-        HandleInput();
 
+        // UIManagerに報告
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.UpdateUI(_currentTarget, _currentHit);
+        }
     }
-
-    
 
     private void UpdateRay()
     {
-        currentTarget = null;
-
+        _currentTarget = null;
+        
+        // カメラの正面へレイを飛ばす
         Ray ray = new Ray(_playerCamera.transform.position, _playerCamera.transform.forward);
 
-
-        if(Physics.Raycast(ray, out RaycastHit hit, _interactDistance))
+        if (Physics.Raycast(ray, out RaycastHit hit, _interactDistance, _interactLayer))
         {
-            IInteractable interactable = hit.collider.GetComponent<IInteractable>();
-
-            if(interactable != null && interactable.CanInteract)
+            // インターフェースの取得
+            if (hit.collider.TryGetComponent<IInteractable>(out var interactable))
             {
-                currentTarget = interactable;
-                currentHit = hit; //UI用にヒット情報をキャッシュ
+                if (interactable.CanInteract)
+                {
+                    _currentTarget = interactable;
+                    _currentHit = hit;
+                }
             }
         }
     }
 
-    private void HandleInput()
+    public void DoInteract()
     {
-        if(currentTarget != null && _interactAction.action.WasPressedThisFrame())
+        if (_currentTarget != null)
         {
-            currentTarget.OnInteract();
+            _currentTarget.Interact();
+            Debug.Log($"{_currentHit.collider.name} とインタラクトした！");
         }
     }
-
 }
