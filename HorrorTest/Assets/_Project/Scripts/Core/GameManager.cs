@@ -5,7 +5,7 @@ public class GameManager : NetworkBehaviour
 {
     // どこからでもアクセスできる「自分自身」の分身
     public static GameManager Instance { get; private set; }
-
+    
     private void Awake()
     {
         // もし既に誰か（別のGameManager）がいたら、自分は消える（重複防止）

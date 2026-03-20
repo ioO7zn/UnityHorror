@@ -1,6 +1,7 @@
 using UnityEngine;
+using Unity.Netcode;
 
-public class VoiceToLight : MonoBehaviour
+public class VoiceToLight : NetworkBehaviour
 {
     public Light targetLight;       // 反応させたいLight
     public float sensitivity = 100f; // 感度調整
@@ -12,6 +13,12 @@ public class VoiceToLight : MonoBehaviour
 
     void Start()
     {
+            // サーバー（画面なし/マイクなし環境）ならボイス初期化をスキップ
+        if (IsServer && !IsClient) 
+        {
+            Debug.Log("Server detected: Skipping microphone initialization.");
+            return; 
+        }
         audioSource = GetComponent<AudioSource>();
         
         // マイクデバイスの確認
