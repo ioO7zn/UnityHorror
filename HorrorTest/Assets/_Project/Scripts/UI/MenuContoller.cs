@@ -1,81 +1,46 @@
 using UnityEngine;
 using Unity.Netcode;
-using UnityEngine.UI;
 
-public class MenuController : MonoBehaviour
+public class MenuController : NetworkBehaviour
 {
-    [Header("UI設定")]
-    [SerializeField] private GameObject menuUI;
-    [SerializeField] private Button hostButton;
-    [SerializeField] private Button clientButton;
+    [SerializeField] private GameObject _menuPanel;
+    private bool _isMenuOpen = false;
 
-    private bool _isMenuOpen = true; // 最初は表示
-    private InputActions _inputActions;
+    // 自分のプレイヤーコントローラーへの参照
+    private PlayerControllerCC _playerController;
 
-    private void Awake()
+    public override void OnNetworkSpawn()
     {
-        _inputActions = new InputActions();
+        if (IsOwner)
+        {
+            _playerController = GetComponent<PlayerControllerCC>();
+        }
+    }
+
+    void Update()
+    {
+        if (!IsOwner) return;
+
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            ToggleMenu();
+        }
+    }
+
+    public void ToggleMenu()
+    {
+        _isMenuOpen = !_isMenuOpen;
+
+        // UIとカーソルの制御
+        if (_menuPanel != null) _menuPanel.SetActive(_isMenuOpen);
         
-        // ESCキーでメニュー切り替え（参加後のみ有効にしたい場合は後述のロジック）
-        _inputActions.Player.Menu.performed += _ => HandleMenuInput();
+        Cursor.lockState = _isMenuOpen ? CursorLockMode.None : CursorLockMode.Locked;
+        Cursor.visible = _isMenuOpen;
 
-        // ボタンに機能を登録
-        hostButton.onClick.AddListener(OnHostButtonClicked);
-        clientButton.onClick.AddListener(OnClientButtonClicked);
-    }
-
-    private void Start()
-    {
-        // 最初はメニューを表示し、カーソルを自由にする
-        OpenMenu();
-    }
-
-    private void OnEnable() => _inputActions.Enable();
-    private void OnDisable() => _inputActions.Disable();
-
-    // ESCキーが押された時の処理
-    private void HandleMenuInput()
-    {
-        // ネットワークが動いていない（まだ参加していない）ときは、ESCで閉じさせない
-        if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer) return;
-
-        if (_isMenuOpen) CloseMenu();
-        else OpenMenu();
-    }
-
-    private void OnHostButtonClicked()
-    {
-        if (NetworkManager.Singleton.StartHost())
+        // --- 重要: プレイヤーの入力を止める/再開する ---
+        if (_playerController != null)
         {
-            CloseMenu();
+            _playerController.SetInputLock(_isMenuOpen);
         }
-    }
-
-    private void OnClientButtonClicked()
-    {
-        if (NetworkManager.Singleton.StartClient())
-        {
-            CloseMenu();
-        }
-    }
-
-    public void OpenMenu()
-    {
-        _isMenuOpen = true;
-        menuUI.SetActive(true);
-        SetCursorState(false);
-    }
-
-    public void CloseMenu()
-    {
-        _isMenuOpen = false;
-        menuUI.SetActive(false);
-        SetCursorState(true);
-    }
-
-    private void SetCursorState(bool isLocked)
-    {
-        Cursor.lockState = isLocked ? CursorLockMode.Locked : CursorLockMode.None;
-        Cursor.visible = !isLocked;
     }
 }

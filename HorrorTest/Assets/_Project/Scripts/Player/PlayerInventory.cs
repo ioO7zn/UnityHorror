@@ -11,7 +11,7 @@ public class PlayerInventory : NetworkBehaviour
 
     // 内部的なIDリスト（サーバーが管理し、Ownerに同期される）
     
-    private NetworkList<int> itemIds = new NetworkList<int>();
+    public NetworkList<int> itemIds = new NetworkList<int>();
 
     // 表示用のリスト（UIなどで使用）
     public List<ItemData> currentItems = new List<ItemData>();
@@ -108,7 +108,7 @@ public class PlayerInventory : NetworkBehaviour
 
     private void CheckVictoryCondition()
     {
-        if (!IsServer || gameManager == null) return;
+        //if (!IsServer || gameManager == null) return;
 
         // 現在のインベントリに、勝利に必要なIDが全て含まれているか確認
         bool hasAllKeys = true;

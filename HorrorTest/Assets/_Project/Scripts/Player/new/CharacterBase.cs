@@ -20,6 +20,7 @@ public abstract class CharacterBase : NetworkBehaviour
         _controller = GetComponent<CharacterController>();
         if (_animator == null) _animator = GetComponentInChildren<Animator>();
     }
+    
 
     // ★重要: 物理移動の実行部分だけをメソッド化
     // これを呼べば人間でもAIでも「歩く」という物理現象が起きる
