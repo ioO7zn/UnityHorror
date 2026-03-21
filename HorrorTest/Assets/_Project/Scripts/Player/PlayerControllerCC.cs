@@ -2,8 +2,8 @@ using UnityEngine;
 using Unity.Cinemachine;
 using UnityEngine.InputSystem; 
 using UnityEngine.Events;
-using Unity.Netcode; // 追加
-using UnityEngine.SceneManagement; // シーン判定に必要
+using Unity.Netcode;
+using UnityEngine.SceneManagement; 
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerControllerCC : CharacterBase
@@ -50,7 +50,6 @@ public class PlayerControllerCC : CharacterBase
 
     private void OnSceneEvent(SceneEvent sceneEvent)
     {
-        // シーンロード完了時に状態を更新
         if (sceneEvent.SceneEventType == SceneEventType.LoadEventCompleted)
         {
             UpdateControlState();
@@ -61,21 +60,16 @@ public class PlayerControllerCC : CharacterBase
     {
         if (!IsOwner) return;
 
-        // 現在のシーンがロビーかどうか判定
         bool isLobby = SceneManager.GetActiveScene().name == "LobbyScene";
-
         if (isLobby)
         {
-            // ロビー：動かさない
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
-            // 入力値をリセットして、Updateでの移動を止める
             _moveInput = Vector2.zero;
             _lookInput = Vector2.zero;
         }
         else
         {
-            // ゲームシーン：動かせる
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
@@ -83,11 +77,10 @@ public class PlayerControllerCC : CharacterBase
 
     protected virtual void Update()
     {
-        // ロビーなら処理を中断（これでキー入力を無視できる）
         if (!IsOwner || SceneManager.GetActiveScene().name == "LobbyScene") return;
         
-        // 通常のゲーム中処理
-        if (Cursor.lockState != CursorLockMode.Locked) return;
+        //if (Cursor.lockState != CursorLockMode.Locked) return;
+        if(_isInputLocked) return;
 
         HandleRotation();
         
@@ -105,7 +98,6 @@ public class PlayerControllerCC : CharacterBase
         }
     }
 
-    // --- 以下、HandleRotation や Input Events はそのまま ---
     private void HandleRotation()
     {
         transform.Rotate(Vector3.up * _lookInput.x * _mouseSensitivity);

@@ -1,46 +1,54 @@
 using UnityEngine;
 using Unity.Netcode;
+using UnityEngine.SceneManagement;
 
 public class MenuController : NetworkBehaviour
 {
-    [SerializeField] private GameObject _menuPanel;
+    private GameObject _menuCanvas; 
     private bool _isMenuOpen = false;
-
-    // 自分のプレイヤーコントローラーへの参照
-    private PlayerControllerCC _playerController;
+    private PlayerControllerCC _player;
 
     public override void OnNetworkSpawn()
     {
         if (IsOwner)
         {
-            _playerController = GetComponent<PlayerControllerCC>();
+            _player = GetComponent<PlayerControllerCC>();
+
+            _menuCanvas = GameObject.Find("MenuCanvas");
+
+            if (_menuCanvas != null)
+            {
+                _menuCanvas.SetActive(false); 
+            }
+            else
+            {
+                Debug.LogError("ヒエラルキーに 'MenuCanvas' が見つかりません！名前が一致しているか確認してください。");
+            }
+            // Cursor.lockState = CursorLockMode.Locked;
+            // Cursor.visible = false;
         }
-    }
-
-    void Update()
-    {
-        if (!IsOwner) return;
-
-        if (Input.GetKeyDown(KeyCode.Escape))
+        else
         {
-            ToggleMenu();
+            this.enabled = false;
         }
     }
+
 
     public void ToggleMenu()
     {
-        _isMenuOpen = !_isMenuOpen;
+        if (!IsOwner || SceneManager.GetActiveScene().name == "LobbyScene") return;
+        if (_menuCanvas == null) return;
 
-        // UIとカーソルの制御
-        if (_menuPanel != null) _menuPanel.SetActive(_isMenuOpen);
+        _isMenuOpen = !_isMenuOpen;
         
+        _menuCanvas.SetActive(_isMenuOpen);
+
         Cursor.lockState = _isMenuOpen ? CursorLockMode.None : CursorLockMode.Locked;
         Cursor.visible = _isMenuOpen;
 
-        // --- 重要: プレイヤーの入力を止める/再開する ---
-        if (_playerController != null)
+        if (_player != null)
         {
-            _playerController.SetInputLock(_isMenuOpen);
+            _player.SetInputLock(_isMenuOpen);
         }
     }
 }

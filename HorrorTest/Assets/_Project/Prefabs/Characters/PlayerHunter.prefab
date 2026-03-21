@@ -79,7 +79,7 @@ PrefabInstance:
     - target: {fileID: 2580717891548236978, guid: 9ae0d5543d6b7674386bf4fbab070b90, type: 3}
       propertyPath: m_ActionEvents.Array.data[4].m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
-      objectReference: {fileID: 2253469312337846479}
+      objectReference: {fileID: 8409680047352589043}
     - target: {fileID: 2580717891548236978, guid: 9ae0d5543d6b7674386bf4fbab070b90, type: 3}
       propertyPath: m_ActionEvents.Array.data[1].m_PersistentCalls.m_Calls.Array.data[0].m_CallState
       value: 2
@@ -109,6 +109,10 @@ PrefabInstance:
       value: OnSprint
       objectReference: {fileID: 0}
     - target: {fileID: 2580717891548236978, guid: 9ae0d5543d6b7674386bf4fbab070b90, type: 3}
+      propertyPath: m_ActionEvents.Array.data[4].m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
+      value: ToggleMenu
+      objectReference: {fileID: 0}
+    - target: {fileID: 2580717891548236978, guid: 9ae0d5543d6b7674386bf4fbab070b90, type: 3}
       propertyPath: m_ActionEvents.Array.data[1].m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
       value: SurvivorController, Assembly-CSharp
       objectReference: {fileID: 0}
@@ -121,6 +125,10 @@ PrefabInstance:
       value: SurvivorController, Assembly-CSharp
       objectReference: {fileID: 0}
     - target: {fileID: 2580717891548236978, guid: 9ae0d5543d6b7674386bf4fbab070b90, type: 3}
+      propertyPath: m_ActionEvents.Array.data[4].m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
+      value: MenuController, Assembly-CSharp
+      objectReference: {fileID: 0}
+    - target: {fileID: 2580717891548236978, guid: 9ae0d5543d6b7674386bf4fbab070b90, type: 3}
       propertyPath: m_ActionEvents.Array.data[1].m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
       value: UnityEngine.Object, UnityEngine
       objectReference: {fileID: 0}
@@ -130,6 +138,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2580717891548236978, guid: 9ae0d5543d6b7674386bf4fbab070b90, type: 3}
       propertyPath: m_ActionEvents.Array.data[3].m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
+      value: UnityEngine.Object, UnityEngine
+      objectReference: {fileID: 0}
+    - target: {fileID: 2580717891548236978, guid: 9ae0d5543d6b7674386bf4fbab070b90, type: 3}
+      propertyPath: m_ActionEvents.Array.data[4].m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
       value: UnityEngine.Object, UnityEngine
       objectReference: {fileID: 0}
     - target: {fileID: 3689249553185833933, guid: 9ae0d5543d6b7674386bf4fbab070b90, type: 3}
@@ -238,6 +250,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3689249553185833933, guid: 9ae0d5543d6b7674386bf4fbab070b90, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4796426909956044042}
+    - targetCorrespondingSourceObject: {fileID: 3689249553185833933, guid: 9ae0d5543d6b7674386bf4fbab070b90, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8409680047352589043}
   m_SourcePrefab: {fileID: 100100000, guid: 9ae0d5543d6b7674386bf4fbab070b90, type: 3}
 --- !u!1 &2253469312337846479 stripped
 GameObject:
@@ -277,6 +292,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: db8b3ab82478cab43890182f109e24ef, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VoiceToLight
+  ShowTopMostFoldoutHeaderGroup: 1
   targetLight: {fileID: 8697519472004541555}
   sensitivity: 100
   lerpSpeed: 10
@@ -409,6 +425,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aacccd383faf2bf4282bb58ab8cdf86f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ClientAuthSpawner
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &8409680047352589043
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2253469312337846479}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 78915af5da6eb4347bda6c3ed3adec84, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MenuController
   ShowTopMostFoldoutHeaderGroup: 1
 --- !u!4 &2847854123006888868 stripped
 Transform:
