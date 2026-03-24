@@ -6,6 +6,10 @@ public abstract class CharacterBase : NetworkBehaviour
 {
     [Header("共通ステータス")]
     public NetworkVariable<int> Health = new NetworkVariable<int>(100);
+    protected readonly NetworkVariable<float> AnimSpeed = new NetworkVariable<float>(
+        0f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
     [SerializeField] protected float _walkSpeed = 5f;
     [SerializeField] protected float _sprintSpeed = 8f;
     [SerializeField] protected float _gravity = -9.81f;
@@ -19,6 +23,17 @@ public abstract class CharacterBase : NetworkBehaviour
     {
         _controller = GetComponent<CharacterController>();
         if (_animator == null) _animator = GetComponentInChildren<Animator>();
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        AnimSpeed.OnValueChanged += OnAnimSpeedChanged;
+        ApplyAnimationSpeed(AnimSpeed.Value);
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        AnimSpeed.OnValueChanged -= OnAnimSpeedChanged;
     }
     
 
@@ -45,8 +60,24 @@ public abstract class CharacterBase : NetworkBehaviour
 
     private void UpdateAnimation(float magnitude, bool isSprinting)
     {
-        if (_animator == null) return;
         float speedParam = magnitude > 0.1f ? (isSprinting ? 2.0f : 1.0f) : 0f;
+
+        if (IsServer)
+        {
+            AnimSpeed.Value = speedParam;
+        }
+
+        ApplyAnimationSpeed(speedParam);
+    }
+
+    private void OnAnimSpeedChanged(float previousValue, float newValue)
+    {
+        ApplyAnimationSpeed(newValue);
+    }
+
+    private void ApplyAnimationSpeed(float speedParam)
+    {
+        if (_animator == null) return;
         _animator.SetFloat("Speed", speedParam, 0.1f, Time.deltaTime);
     }
 

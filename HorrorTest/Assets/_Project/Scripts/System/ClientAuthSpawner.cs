@@ -33,22 +33,8 @@ public class ClientAuthSpawner : NetworkBehaviour
             int targetIndex = myIndex % spawnPoints.Length;
             Transform target = spawnPoints[targetIndex].transform;
 
-            // キャラコンの無効化
-            var cc = GetComponent<CharacterController>();
-            if (cc != null) cc.enabled = false;
-
-            // ワープ実行
-            transform.position = target.position;
-            transform.rotation = target.rotation;
-
-            var nt = GetComponent<NetworkTransform>();
-            if (nt != null)
-            {
-                nt.Teleport(target.position, target.rotation, transform.localScale);
-            }
-
-            yield return new WaitForSeconds(0.1f);
-            if (cc != null) cc.enabled = true;
+            // サーバーに位置設定を依頼（ServerRpc）
+            SetPositionRpc(target.position, target.rotation);
 
             Debug.Log($"[ClientAuth] Player {myIndex} は {target.name} ({target.position}) に着地しました！");
         }
@@ -56,5 +42,32 @@ public class ClientAuthSpawner : NetworkBehaviour
         {
             Debug.LogError("SpawnPointが見つかりません！");
         }
+    }
+
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+    private void SetPositionRpc(Vector3 position, Quaternion rotation)
+    {
+        // キャラコンの無効化
+        var cc = GetComponent<CharacterController>();
+        if (cc != null) cc.enabled = false;
+
+        // サーバー側で位置設定
+        transform.position = position;
+        transform.rotation = rotation;
+
+        var nt = GetComponent<NetworkTransform>();
+        if (nt != null)
+        {
+            nt.Teleport(position, rotation, transform.localScale);
+        }
+
+        // 少し待ってから有効化
+        StartCoroutine(ReEnableCharacterController(cc));
+    }
+
+    private IEnumerator ReEnableCharacterController(CharacterController cc)
+    {
+        yield return new WaitForSeconds(0.1f);
+        if (cc != null) cc.enabled = true;
     }
 }

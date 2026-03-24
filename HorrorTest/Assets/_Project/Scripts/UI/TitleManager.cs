@@ -39,11 +39,9 @@ public class TitleManager : MonoBehaviour
 
         if(loadingScreen != null) loadingScreen.SetActive(true);
 
-        // 1. まずHostとして起動
+        // 1. Host（ローカルテスト用）
         if (NetworkManager.Singleton.StartHost())
         {
-            // 2. Netcode専用のシーンマネージャーでシーンを切り替える
-            // これにより、接続してくるClientも自動的にこのシーンへ飛ばされます
             NetworkManager.Singleton.SceneManager.LoadScene("LobbyScene", LoadSceneMode.Single);
         }
         else
@@ -62,12 +60,33 @@ public class TitleManager : MonoBehaviour
 
         if(loadingScreen != null) loadingScreen.SetActive(true);
 
-        // クライアントとして起動。接続が成功すればサーバーが呼んだシーンへ自動で飛ばされます。
         if (!NetworkManager.Singleton.StartClient())
         {
             _isLoading = false;
             if(loadingScreen != null) loadingScreen.SetActive(false);
             Debug.LogError("クライアントの起動に失敗しました");
+        }
+    }
+
+    // --- Dedicated Server（VPSサーバ）ボタンにアサイン ---
+    public void OnDedicatedServerButtonClicked()
+    {
+        if (_isLoading) return;
+        _isLoading = true;
+
+        if(loadingScreen != null) loadingScreen.SetActive(true);
+
+        if (!NetworkManager.Singleton.StartServer())
+        {
+            _isLoading = false;
+            if(loadingScreen != null) loadingScreen.SetActive(false);
+            Debug.LogError("専用サーバの起動に失敗しました");
+        }
+        else
+        {
+            // ここではサーバーのみのシーン管理を行う
+            NetworkManager.Singleton.SceneManager.LoadScene("LobbyScene", LoadSceneMode.Single);
+            Debug.Log("Dedicated server started.");
         }
     }
 

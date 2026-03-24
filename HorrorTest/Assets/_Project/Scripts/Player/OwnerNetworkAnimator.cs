@@ -1,10 +1,10 @@
 using Unity.Netcode.Components;
 
-// これを貼るだけで「操作している人」のアニメーションが全員に同期されるようになります
+// プレイヤー移動がサーバー権威なので、アニメーション同期もサーバー権威に合わせる。
 public class OwnerNetworkAnimator : NetworkAnimator
 {
     protected override bool OnIsServerAuthoritative()
     {
-        return false;
+        return true;
     }
 }

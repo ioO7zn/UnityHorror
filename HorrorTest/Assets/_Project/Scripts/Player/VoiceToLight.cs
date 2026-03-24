@@ -1,6 +1,7 @@
 using UnityEngine;
 using Unity.Netcode;
 
+[RequireComponent(typeof(AudioSource))]
 public class VoiceToLight : NetworkBehaviour
 {
     public Light targetLight;       // 反応させたいLight
@@ -10,16 +11,32 @@ public class VoiceToLight : NetworkBehaviour
 
     private AudioSource audioSource;
     private string deviceName;
+    private bool microphoneReady;
+
+    private bool ShouldSkipMicrophoneInitialization()
+    {
+#if UNITY_SERVER
+        return true;
+#else
+        return IsServer && !IsClient;
+#endif
+    }
 
     void Start()
     {
-            // サーバー（画面なし/マイクなし環境）ならボイス初期化をスキップ
-        if (IsServer && !IsClient) 
+        // 専用サーバーやバッチモードでは録音デバイスに触らない
+        if (ShouldSkipMicrophoneInitialization())
         {
-            Debug.Log("Server detected: Skipping microphone initialization.");
-            return; 
+            enabled = false;
+            return;
         }
+
         audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            enabled = false;
+            return;
+        }
         
         // マイクデバイスの確認
         if (Microphone.devices.Length > 0)
@@ -32,11 +49,21 @@ public class VoiceToLight : NetworkBehaviour
             // マイクの準備ができるまで待機
             while (!(Microphone.GetPosition(deviceName) > 0)) { }
             audioSource.Play();
+            microphoneReady = true;
+        }
+        else
+        {
+            enabled = false;
         }
     }
 
     void Update()
     {
+        if (!microphoneReady || targetLight == null)
+        {
+            return;
+        }
+
         float loudness = GetLoudnessFromAudio() * sensitivity;
         
         // Lightの強度をなめらかに変化させる
@@ -45,6 +72,11 @@ public class VoiceToLight : NetworkBehaviour
 
     float GetLoudnessFromAudio()
     {
+        if (!microphoneReady || string.IsNullOrEmpty(deviceName) || audioSource == null || audioSource.clip == null)
+        {
+            return 0f;
+        }
+
         int sampleCount = 128; // 解析するサンプル数
         float[] waveData = new float[sampleCount];
         int micPosition = Microphone.GetPosition(deviceName) - (sampleCount + 1);
@@ -59,5 +91,15 @@ public class VoiceToLight : NetworkBehaviour
             totalLoudness += Mathf.Abs(sample);
         }
         return totalLoudness / sampleCount;
+    }
+
+    void OnDisable()
+    {
+        if (!string.IsNullOrEmpty(deviceName) && Microphone.IsRecording(deviceName))
+        {
+            Microphone.End(deviceName);
+        }
+
+        microphoneReady = false;
     }
 }

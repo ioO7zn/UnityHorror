@@ -1,14 +1,13 @@
 using Unity.Netcode.Components;
 using UnityEngine;
 
-// クライアント(Owner)にTransformの決定権を譲渡するクラス
+// サーバー権威型のTransform同期クラス
 [DisallowMultipleComponent]
-public class ClientNetworkTransform : NetworkTransform
+public class ServerNetworkTransform : NetworkTransform
 {
-    // サーバーが権限を持つか？に「false(いいえ)」と答えることで、
-    // クライアント主導の同期が可能になります
+    // サーバーが権限を持つ：true
     protected override bool OnIsServerAuthoritative()
     {
-        return false;
+        return true;
     }
 }
